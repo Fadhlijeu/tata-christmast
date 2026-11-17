@@ -8,9 +8,9 @@
 <title>ASCII Christmas Tree</title>
 <style>
 *{box-sizing:border-box}
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#07090e}
-body{display:grid;place-items:center}
-canvas{display:block;max-width:100vw;max-height:100vh}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
+body{display:grid;place-items:center;background:#000}
+canvas{display:block;width:100vw;height:100vh;max-width:100vw;max-height:100vh;background:#000}
 </style>
 </head>
 <body>
@@ -30,7 +30,9 @@ const TAU = Math.PI * 2;
 const GROUND = -1.18, Y0 = -.96, Y1 = 1.34, GROUND_R = 1.55;
 const T_GROW = [.2, 4.6], T_GARLAND = [4.8, 7.0], T_ORN = [6.6, 8.6];
 const T_LIGHTS = [7.8, 10.4], T_GIFTS = [9.2, 10.9], T_STAR = 11.4;
-const PITCH = .19, CAM_D = 6, SCALE_Y = 20.5, ROT_SPEED = .45;
+const PITCH = .19, CAM_D = 6, ROT_SPEED = .45;
+let SCALE_Y = 20.5;
+let TREE_CENTER_X = .66;
 const CW = 9, CH = 14;
 const WHITE = [.96,.98,1], GOLD = [1,.80,.24], BAUBLE_GOLD = [1,.84,.36];
 const RED = [.95,.14,.16], SILVER = [.82,.88,.96], GREEN_BOX = [.15,.72,.32];
@@ -303,16 +305,18 @@ function buildScene(){
 
 function resize(){
   const mobile=window.innerWidth<700;
-  cols=mobile?48:88;
-  rows=mobile?64:74;
-  aspect=mobile?.72:CW/CH;
-  logicalW=cols*CW;logicalH=rows*CH;
+  logicalW=window.innerWidth;
+  logicalH=window.innerHeight;
+  cols=Math.max(1,Math.floor(logicalW/CW));
+  rows=Math.max(1,Math.floor(logicalH/CH));
+  aspect=mobile?.90:CW/CH;
+  SCALE_Y=mobile?16:20.5;
+  TREE_CENTER_X=mobile?.68:.66;
   dpr=Math.min(window.devicePixelRatio||1,2);
   canvas.width=Math.round(logicalW*dpr);
   canvas.height=Math.round(logicalH*dpr);
-  const fit=Math.min(window.innerWidth/logicalW,window.innerHeight/logicalH);
-  canvas.style.width=(logicalW*fit)+"px";
-  canvas.style.height=(logicalH*fit)+"px";
+  canvas.style.width=logicalW+"px";
+  canvas.style.height=logicalH+"px";
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.font='14px "Courier New",Consolas,monospace';
   ctx.textBaseline="alphabetic";
@@ -322,13 +326,13 @@ function resize(){
   colors=new Uint8ClampedArray(cols*rows*3);
 }
 
-function project(x,y,z,rot,cr,sr){
+function project(x,y,z,rot,cr,sr,centerX=TREE_CENTER_X){
   const rx=x*cr+z*sr,rz=-x*sr+z*cr;
   const cp=Math.cos(PITCH),sp=Math.sin(PITCH);
   const y2=y*cp-rz*sp,z2=y*sp+rz*cp;
   const distance=CAM_D-z2,f=CAM_D/distance;
   return [
-    cols/2+rx*f*SCALE_Y/aspect,
+    cols*centerX+rx*f*SCALE_Y/aspect,
     rows*.47-y2*f*SCALE_Y,
     distance
   ];
@@ -402,6 +406,61 @@ function drawStar(t,rot){
   }
 }
 
+function drawSanta(t){
+  const sprite=[
+    "         W         ",
+    "        RRR        ",
+    "       RRRRR       ",
+    "      RRRRRRR      ",
+    "     RRRRRRRRR     ",
+    "    WWWWWWWWWWW    ",
+    "    WPPPPPPPPPW    ",
+    "    WPKPPPPPKPW    ",
+    "    WPPPPPPPPPW    ",
+    "     WPPPPPW       ",
+    "      WWWWW        ",
+    "   GGGRRRRRRRRR    ",
+    "  GGGGRRRRRRRRRR   ",
+    "   GGRRRYYYYRRRR   ",
+    "     RRRRRRRRR     ",
+    "     RRRRRRRRR     ",
+    "      RRR RRR      ",
+    "      KKK KKK      "
+  ];
+  const palette={
+    W:["*",[.96,.97,1]],
+    R:["#", [.94,.12,.16]],
+    P:["@",[1,.69,.49]],
+    K:[".",[.10,.09,.10]],
+    G:["%",[.13,.48,.24]],
+    Y:["+",[1,.78,.28]]
+  };
+  const mobile=window.innerWidth<700;
+  const scale=mobile?.72:1;
+  const width=Math.max(...sprite.map(row=>row.length));
+  const height=Math.ceil(sprite.length*scale);
+  const x0=mobile?1:Math.max(2,Math.round(cols*.11));
+  const y0=Math.max(0,rows-height-(mobile?2:3));
+  const bob=Math.sin(t*1.7)*.18;
+
+  for(let y=0;y<sprite.length;y++){
+    for(let x=0;x<sprite[y].length;x++){
+      const marker=sprite[y][x];
+      const style=palette[marker];
+      if(!style)continue;
+      const sx=x0+Math.round(x*scale);
+      const sy=y0+Math.round(y*scale+bob);
+      if(sx<0||sx>=cols||sy<0||sy>=rows)continue;
+      const index=sy*cols+sx,offset=index*3;
+      glyphs[index]=style[0].charCodeAt(0);
+      colors[offset]=Math.round(style[1][0]*255);
+      colors[offset+1]=Math.round(style[1][1]*255);
+      colors[offset+2]=Math.round(style[1][2]*255);
+      cellKinds[index]=255;
+    }
+  }
+}
+
 function render(t){
   glyphs.fill(0);depths.fill(Infinity);cellKinds.fill(255);
   const rot=ROT_SPEED*t,cr=Math.cos(rot),sr=Math.sin(rot);
@@ -422,7 +481,7 @@ function render(t){
     const rx=x*cr+z*sr,rz=-x*sr+z*cr;
     const y2=y*cp-rz*sp,z2=y*sp+rz*cp;
     const distance=CAM_D-z2,projection=CAM_D/distance;
-    const sx=Math.round(cols/2+rx*projection*SCALE_Y/aspect);
+    const sx=Math.round(cols*TREE_CENTER_X+rx*projection*SCALE_Y/aspect);
     const sy=Math.round(rows*.47-y2*projection*SCALE_Y);
     if(sx<0||sx>=cols||sy<0||sy>=rows)continue;
     const cell=sy*cols+sx;if(distance>=depths[cell])continue;
@@ -477,7 +536,7 @@ function render(t){
   // Falling snow remains behind the tree and ornaments.
   for(const flake of flakes){
     const y=1.95-((t*flake.spd+flake.off)%3.35);
-    const point=project(flake.x+.14*Math.sin(t*.8+flake.phase),y,flake.z,rot,cr,sr);
+    const point=project(flake.x+.14*Math.sin(t*.8+flake.phase),y,flake.z,rot,cr,sr,.5);
     const x=Math.round(point[0]),py=Math.round(point[1]);
     if(x<0||x>=cols||py<0||py>=rows)continue;
     const index=py*cols+x;if(glyphs[index]!==0)continue;
@@ -486,12 +545,10 @@ function render(t){
   }
 
   if(t>T_STAR)drawStar(t,rot);
+  drawSanta(t);
 
-  // A quiet night background; the tree is the only foreground element.
-  const gradient=ctx.createLinearGradient(0,0,0,logicalH);
-  gradient.addColorStop(0,"#07090e");
-  gradient.addColorStop(1,"#0c0f17");
-  ctx.fillStyle=gradient;
+  // Pure black canvas background, matching the page background.
+  ctx.fillStyle="#000";
   ctx.fillRect(0,0,logicalW,logicalH);
   for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
     const index=y*cols+x,code=glyphs[index];
@@ -522,37 +579,58 @@ window.addEventListener("resize",()=>{
 const soundtrack=document.getElementById("soundtrack");
 let soundtrackStarted=false;
 let soundtrackPending=false;
+let lastGestureAt=0;
 soundtrack.loop=true;
-soundtrack.volume=0.9;
+soundtrack.volume=1;
+soundtrack.preload="auto";
+soundtrack.setAttribute("playsinline","");
+soundtrack.setAttribute("webkit-playsinline","");
 
-function startSoundtrack(){
-  if(soundtrackStarted || soundtrackPending)return;
+function startSoundtrack(event){
+  const trustedGesture=Boolean(event&&event.isTrusted);
+  if(soundtrackStarted&&!soundtrack.paused)return;
+  if(soundtrackPending&&!trustedGesture)return;
+  if(trustedGesture){
+    const now=Date.now();
+    if(now-lastGestureAt<120)return;
+    lastGestureAt=now;
+  }
+
   soundtrackPending=true;
-  const attempt=soundtrack.play();
-  if(attempt&&typeof attempt.then==="function"){
-    attempt.then(()=>{
+  soundtrack.muted=false;
+  soundtrack.volume=1;
+
+  try{
+    const attempt=soundtrack.play();
+    if(attempt&&typeof attempt.then==="function"){
+      attempt.then(()=>{
+        soundtrackStarted=true;
+        soundtrackPending=false;
+      }).catch(()=>{
+        soundtrackStarted=false;
+        soundtrackPending=false;
+      });
+    }else{
       soundtrackStarted=true;
       soundtrackPending=false;
-    }).catch(()=>{
-      // Audible autoplay may be blocked by the browser; retry on readiness or user input.
-      soundtrackPending=false;
-    });
-  }else{
-    soundtrackStarted=true;
+    }
+  }catch(error){
+    soundtrackStarted=false;
     soundtrackPending=false;
   }
 }
 
-// Try immediately on page load, then again when the MP3 has buffered enough to play.
+// Start automatically where permitted; mobile playback is retried synchronously
+// inside real touch/click gestures so the browser can unlock audible media.
 startSoundtrack();
 soundtrack.addEventListener("canplay",startSoundtrack);
+soundtrack.addEventListener("canplaythrough",startSoundtrack);
 window.addEventListener("pageshow",startSoundtrack);
 document.addEventListener("visibilitychange",()=>{
-  if(!document.hidden)startSoundtrack();
+  if(!document.hidden&&soundtrack.paused)startSoundtrack();
 });
 
-// Mobile browsers may only allow audible playback after a trusted user gesture.
-for(const eventName of ["pointerdown","touchend","click","keydown"]){
+for(const eventName of ["pointerdown","pointerup","touchstart","touchend","click","keydown"]){
   window.addEventListener(eventName,startSoundtrack,{capture:true,passive:true});
 }
 
