@@ -1,4 +1,6 @@
-# ASCII Christmas Tree
+# Tata Christmast
+
+An animated ASCII Christmas tree with a looping soundtrack.
 
 A full-screen, procedural 3D Christmas tree rendered in ASCII characters.
 
